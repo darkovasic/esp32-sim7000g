@@ -1,0 +1,10 @@
+# ESP32 (DevKitC) + SIM7000G UART: see main/main.c (UART2, TX=GPIO17, RX=GPIO16).
+# After cloning without sdkconfig: run `idf.py set-target esp32` then `idf.py build`.
+# Refresh this file from your tree anytime: `idf.py save-defconfig` (then re-add comments if needed).
+#
+# This file was generated using idf.py save-defconfig. It can be edited manually.
+# Espressif IoT Development Framework (ESP-IDF) 6.1.0 Project Minimal Configuration
+#
+
+# Default IDF main stack is 3584; modest headroom for richer AT / future PPP without menuconfig.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096

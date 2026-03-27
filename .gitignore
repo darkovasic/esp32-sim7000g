@@ -1,0 +1,22 @@
+# ESP-IDF build output
+/build/
+
+# Local configuration (per-machine / menuconfig)
+/sdkconfig
+/sdkconfig.old
+
+# Component manager (if used later)
+/managed_components/
+dependencies.lock
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
