@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esp_err.h"
+#include "esp_modem_c_api_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,10 +12,10 @@ typedef struct {
 } sim7000_config_t;
 
 /**
- * Run identification + SIM + registration (+ optional PDP). Requires:
- * modem_uart_init(), at_client_init().
+ * Run identification + SIM + registration (+ optional PDP) via esp_modem.
+ * Requires a DCE created with esp_modem_new_dev() (UART owned by esp_modem).
  */
-esp_err_t sim7000_bringup(const sim7000_config_t *cfg);
+esp_err_t sim7000_bringup(esp_modem_dce_t *dce, const sim7000_config_t *cfg);
 
 #ifdef __cplusplus
 }

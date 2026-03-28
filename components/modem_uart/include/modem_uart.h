@@ -11,6 +11,12 @@
 extern "C" {
 #endif
 
+/**
+ * Configure PWRKEY GPIO from Kconfig (no-op if disabled). Use when UART is owned by esp_modem
+ * instead of modem_uart_init().
+ */
+esp_err_t modem_pwrkey_gpio_init(void);
+
 /** Install UART driver and configure pins from Kconfig. Call once before AT traffic. */
 esp_err_t modem_uart_init(void);
 
