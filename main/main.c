@@ -1,5 +1,5 @@
 /*
- * ESP32 + SIM7000: esp_modem UART DTE, PPP esp_netif, SIM7000 DCE bring-up.
+ * ESP32 + SIM7000: esp_modem UART DTE, PPP esp_netif, SIM7000 DCE bring-up + data mode.
  * Wiring: see README and `idf.py menuconfig` -> Modem UART transport.
  */
 #include <stdio.h>
@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "modem_config.h"
 #include "modem_uart.h"
@@ -22,14 +23,60 @@
 #include "esp_modem_api.h"
 #include "esp_modem_config.h"
 #include "esp_modem_dce_config.h"
+#include "esp_netif_ppp.h"
+#include "lwip/ip4_addr.h"
 #endif
 
 static const char *TAG = "app";
 
 #if CONFIG_LWIP_PPP_SUPPORT
+
+/** esp_modem runs setup_data_mode() before dial: ATE0 + CGDCONT for CID 1 with the DCE APN. */
+#define PPP_WAIT_IP_TIMEOUT_MS 120000
+
 static esp_netif_t *s_ppp_netif;
 static esp_modem_dce_t *s_dce;
-#endif
+static EventGroupHandle_t s_conn_events;
+
+#define CONN_PPP_GOT_IP BIT0
+#define CONN_PPP_LOST_IP BIT1
+
+static void on_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_base;
+
+    if (event_id == IP_EVENT_PPP_GOT_IP) {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        if (event->esp_netif != s_ppp_netif) {
+            return;
+        }
+        ESP_LOGI(TAG, "PPP got IP: " IPSTR " mask " IPSTR " gw " IPSTR, IP2STR(&event->ip_info.ip),
+                 IP2STR(&event->ip_info.netmask), IP2STR(&event->ip_info.gw));
+        esp_netif_dns_info_t dns;
+        if (esp_netif_get_dns_info(event->esp_netif, ESP_NETIF_DNS_MAIN, &dns) == ESP_OK) {
+            ESP_LOGI(TAG, "DNS: " IPSTR, IP2STR(&dns.ip.u_addr.ip4));
+        }
+        if (s_conn_events) {
+            xEventGroupSetBits(s_conn_events, CONN_PPP_GOT_IP);
+        }
+    } else if (event_id == IP_EVENT_PPP_LOST_IP) {
+        ESP_LOGW(TAG, "PPP lost IP");
+        if (s_conn_events) {
+            xEventGroupSetBits(s_conn_events, CONN_PPP_LOST_IP);
+        }
+    }
+}
+
+static void on_ppp_phase(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_base;
+    (void)event_data;
+    ESP_LOGD(TAG, "NETIF_PPP event %ld", (long)event_id);
+}
+
+#endif /* CONFIG_LWIP_PPP_SUPPORT */
 
 void app_main(void)
 {
@@ -106,12 +153,75 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "esp_modem DCE (SIM7000) attached to PPP netif");
 
+    /*
+     * ESP32 reset often powers only the MCU: the modem can stay up still in PPP from the last run.
+     * New DCE state is UNDEF while the UART is PPP-framed → esp_modem_sync times out. From UNDEF,
+     * COMMAND runs esp_modem's exit_data path (stop host PPP, optional +++, modem escape to AT).
+     */
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_err_t cm = esp_modem_set_mode(s_dce, ESP_MODEM_MODE_COMMAND);
+    if (cm != ESP_OK) {
+        ESP_LOGW(TAG, "esp_modem_set_mode(COMMAND) after boot returned %s — trying bring-up anyway",
+                 esp_err_to_name(cm));
+    } else {
+        ESP_LOGI(TAG, "Modem UART in command mode (recovered from stale PPP if needed)");
+    }
+
     sim7000_config_t mcfg = {.apn = apn};
     err = sim7000_bringup(s_dce, &mcfg);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Bring-up incomplete: %s — continuing esp_modem_sync heartbeat", esp_err_to_name(err));
+        ESP_LOGW(TAG, "Bring-up incomplete: %s — PPP may still fail", esp_err_to_name(err));
     }
 
+    s_conn_events = xEventGroupCreate();
+    if (s_conn_events == NULL) {
+        ESP_LOGE(TAG, "EventGroupCreate failed");
+        abort();
+    }
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, on_ip_event, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, on_ppp_phase, NULL));
+
+    xEventGroupClearBits(s_conn_events, CONN_PPP_GOT_IP | CONN_PPP_LOST_IP);
+
+    ESP_LOGI(TAG, "Switching to PPP data mode (stock esp_modem: ATD*99# after CGDCONT)…");
+    ESP_LOGI(TAG, "PPP: LCP/IPCP can take tens of seconds; UART is quiet until IP or failure.");
+    err = esp_modem_set_mode(s_dce, ESP_MODEM_MODE_DATA);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_modem_set_mode(DATA) failed: %s", esp_err_to_name(err));
+        goto command_heartbeat;
+    }
+
+    EventBits_t bits = xEventGroupWaitBits(s_conn_events, CONN_PPP_GOT_IP | CONN_PPP_LOST_IP, pdFALSE,
+                                           pdFALSE, pdMS_TO_TICKS(PPP_WAIT_IP_TIMEOUT_MS));
+    if (bits & CONN_PPP_LOST_IP) {
+        ESP_LOGE(TAG, "PPP lost IP before address assignment");
+        (void)esp_modem_set_mode(s_dce, ESP_MODEM_MODE_COMMAND);
+        goto command_heartbeat;
+    }
+    if ((bits & CONN_PPP_GOT_IP) == 0) {
+        ESP_LOGE(TAG, "Timeout waiting for PPP IP (%d ms)", PPP_WAIT_IP_TIMEOUT_MS);
+        ESP_LOGW(TAG, "Check: carrier APN, SIM7000 RAT/bands, menuconfig LWIP PPP IPv6 off; "
+                      "enable CONFIG_LWIP_PPP_DEBUG_ON for lwIP PPP trace; "
+                      "for dial-string changes vendor esp_modem (do not patch managed_components).");
+        (void)esp_modem_set_mode(s_dce, ESP_MODEM_MODE_COMMAND);
+        goto command_heartbeat;
+    }
+
+    ESP_LOGI(TAG, "PPP session up; UART is PPP-framed (no AT sync here). Waiting on IP_EVENT / link loss…");
+
+    while (1) {
+        EventBits_t lost = xEventGroupWaitBits(s_conn_events, CONN_PPP_LOST_IP, pdTRUE, pdFALSE,
+                                               pdMS_TO_TICKS(60000));
+        if (lost & CONN_PPP_LOST_IP) {
+            ESP_LOGW(TAG, "PPP disconnected");
+            (void)esp_modem_set_mode(s_dce, ESP_MODEM_MODE_COMMAND);
+            goto command_heartbeat;
+        }
+        ESP_LOGI(TAG, "PPP still up (idle log every 60 s)");
+    }
+
+command_heartbeat:
+    ESP_LOGI(TAG, "Command-mode heartbeat (esp_modem_sync)");
     while (1) {
         err = esp_modem_sync(s_dce);
         if (err == ESP_OK) {

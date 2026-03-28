@@ -54,6 +54,13 @@ esp_err_t sim7000_bringup(esp_modem_dce_t *dce, const sim7000_config_t *cfg)
     }
     ESP_LOGI(TAG, "CGREG: %s", resp[0] ? resp : "(empty)");
 
+    e = esp_modem_at(dce, "AT+CEREG?", resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS);
+    if (e == ESP_OK && resp[0]) {
+        ESP_LOGI(TAG, "CEREG (LTE/EPS): %s", resp);
+    } else if (e != ESP_OK) {
+        ESP_LOGW(TAG, "AT+CEREG? failed (%s) — LTE registration unknown", esp_err_to_name(e));
+    }
+
 #if CONFIG_SIM7000_BRINGUP_PDP
     const char *apn = (cfg && cfg->apn && cfg->apn[0]) ? cfg->apn : CONFIG_SIM7000_DEFAULT_APN;
     char set_apn[160];
@@ -65,11 +72,16 @@ esp_err_t sim7000_bringup(esp_modem_dce_t *dce, const sim7000_config_t *cfg)
     }
     ESP_RETURN_ON_ERROR(esp_modem_at(dce, set_apn, resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS), TAG,
                         "CGDCONT");
+#if CONFIG_SIM7000_BRINGUP_USE_CGACT
     char act[32];
     snprintf(act, sizeof(act), "AT+CGACT=1,%d", CONFIG_SIM7000_PDP_CID);
     ESP_RETURN_ON_ERROR(esp_modem_at(dce, act, resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS), TAG,
                         "CGACT");
-    ESP_LOGI(TAG, "PDP context %d activated (APN=%s)", CONFIG_SIM7000_PDP_CID, apn);
+    ESP_LOGI(TAG, "PDP CID %d: CGDCONT + CGACT (APN=%s)", CONFIG_SIM7000_PDP_CID, apn);
+#else
+    ESP_LOGI(TAG, "PDP CID %d: CGDCONT only (APN=%s); PPP dial will activate context", CONFIG_SIM7000_PDP_CID,
+             apn);
+#endif
 #endif
 
     return ESP_OK;

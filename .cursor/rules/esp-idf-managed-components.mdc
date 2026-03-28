@@ -1,0 +1,9 @@
+---
+description: Never customize dependencies under managed_components; use vendor or override_path
+alwaysApply: true
+---
+
+# ESP-IDF `managed_components/`
+
+- **Do not edit** files under `managed_components/` for project features or fixes. That tree is typically **gitignored** and is **replaced** when dependencies are updated (`idf.py update-dependencies`, version bumps, fresh clones).
+- To customize **esp_modem** (or any managed component), use a **tracked** copy: vendor under `components/` and point `idf_component.yml` at it with **`override_path`**, or depend on a **fork** URL. Upstream PRs are preferable when the change is generally useful.

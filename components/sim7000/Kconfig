@@ -17,4 +17,14 @@ menu "SIM7000 modem"
         range 1 16
         default 1
 
+    config SIM7000_BRINGUP_USE_CGACT
+        bool "Send AT+CGACT=1 after CGDCONT during bring-up"
+        default n
+        depends on SIM7000_BRINGUP_PDP
+        help
+            When off (default), bring-up only programs the APN with AT+CGDCONT; esp_modem then runs
+            its own CGDCONT and ATD*99# for PPP. On some SIM7xxx/LTE networks, pre-activating with
+            CGACT=1 leaves the context busy and PPP drops before IPCP (no IP). Enable this if your
+            carrier requires explicit activation before the dial.
+
 endmenu
