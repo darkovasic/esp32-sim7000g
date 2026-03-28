@@ -1,11 +1,13 @@
 menu "Modem UART transport"
 
+    comment "UART pins/baud are used by esp_modem DTE in main; this component only provides PWRKEY GPIO."
+
     config MODEM_UART_PORT_NUM
         int "UART port number (ESP32: 0-2)"
         range 0 2
         default 2
         help
-            UART controller connected to the modem (e.g. UART2 on DevKitC).
+            UART controller connected to the modem (e.g. UART2 on DevKitC). Used by main/esp_modem.
 
     config MODEM_UART_TX_GPIO
         int "TX GPIO (ESP32 -> modem RX)"

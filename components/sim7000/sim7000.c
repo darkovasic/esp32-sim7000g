@@ -12,8 +12,8 @@ static const char *TAG = "sim7000";
 
 static esp_err_t cmd_ok(esp_modem_dce_t *dce, const char *c)
 {
-    char resp[CONFIG_AT_CLIENT_MAX_AGG_LEN];
-    esp_err_t e = esp_modem_at(dce, c, resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS);
+    char resp[CONFIG_SIM7000_AT_RESP_MAX_LEN];
+    esp_err_t e = esp_modem_at(dce, c, resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "FAIL %s -> %s", c, esp_err_to_name(e));
         if (resp[0]) {
@@ -30,31 +30,31 @@ esp_err_t sim7000_bringup(esp_modem_dce_t *dce, const sim7000_config_t *cfg)
     ESP_RETURN_ON_ERROR(esp_modem_sync(dce), TAG, "esp_modem_sync");
     ESP_RETURN_ON_ERROR(cmd_ok(dce, "ATE0"), TAG, "ATE0");
 
-    char resp[CONFIG_AT_CLIENT_MAX_AGG_LEN];
-    esp_err_t e = esp_modem_at(dce, "AT+CGMI", resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS);
+    char resp[CONFIG_SIM7000_AT_RESP_MAX_LEN];
+    esp_err_t e = esp_modem_at(dce, "AT+CGMI", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
     if (e == ESP_OK && resp[0]) {
         ESP_LOGI(TAG, "Manufacturer: %s", resp);
     }
-    e = esp_modem_at(dce, "AT+CGMM", resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS);
+    e = esp_modem_at(dce, "AT+CGMM", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
     if (e == ESP_OK && resp[0]) {
         ESP_LOGI(TAG, "Model: %s", resp);
     }
 
     ESP_RETURN_ON_ERROR(cmd_ok(dce, "AT+CPIN?"), TAG, "CPIN");
 
-    e = esp_modem_at(dce, "AT+CREG?", resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS);
+    e = esp_modem_at(dce, "AT+CREG?", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
     if (e != ESP_OK) {
         return e;
     }
     ESP_LOGI(TAG, "CREG: %s", resp[0] ? resp : "(empty)");
 
-    e = esp_modem_at(dce, "AT+CGREG?", resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS);
+    e = esp_modem_at(dce, "AT+CGREG?", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
     if (e != ESP_OK) {
         return e;
     }
     ESP_LOGI(TAG, "CGREG: %s", resp[0] ? resp : "(empty)");
 
-    e = esp_modem_at(dce, "AT+CEREG?", resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS);
+    e = esp_modem_at(dce, "AT+CEREG?", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
     if (e == ESP_OK && resp[0]) {
         ESP_LOGI(TAG, "CEREG (LTE/EPS): %s", resp);
     } else if (e != ESP_OK) {
@@ -70,12 +70,12 @@ esp_err_t sim7000_bringup(esp_modem_dce_t *dce, const sim7000_config_t *cfg)
         ESP_LOGE(TAG, "APN too long");
         return ESP_ERR_INVALID_ARG;
     }
-    ESP_RETURN_ON_ERROR(esp_modem_at(dce, set_apn, resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS), TAG,
+    ESP_RETURN_ON_ERROR(esp_modem_at(dce, set_apn, resp, CONFIG_SIM7000_AT_TIMEOUT_MS), TAG,
                         "CGDCONT");
 #if CONFIG_SIM7000_BRINGUP_USE_CGACT
     char act[32];
     snprintf(act, sizeof(act), "AT+CGACT=1,%d", CONFIG_SIM7000_PDP_CID);
-    ESP_RETURN_ON_ERROR(esp_modem_at(dce, act, resp, CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS), TAG,
+    ESP_RETURN_ON_ERROR(esp_modem_at(dce, act, resp, CONFIG_SIM7000_AT_TIMEOUT_MS), TAG,
                         "CGACT");
     ESP_LOGI(TAG, "PDP CID %d: CGDCONT + CGACT (APN=%s)", CONFIG_SIM7000_PDP_CID, apn);
 #else

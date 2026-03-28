@@ -1,6 +1,6 @@
 # esp32-sim7000g
 
-ESP-IDF firmware for ESP32 talking to a SIM7000-class modem over UART, structured for growth: **transport → AT client (dedicated task) → SIM7000 bring-up → application**.
+ESP-IDF firmware for ESP32 + **SIM7000G** using **esp_modem** (UART DTE, AT, PPP) and **esp_netif** for cellular IP.
 
 ## Requirements
 
@@ -25,29 +25,29 @@ Firmware version is `PROJECT_VER` in the root [CMakeLists.txt](CMakeLists.txt) a
 | GPIO16 (RX) | modem TX |
 | GND | GND |
 
-UART defaults: **UART2**, **115200** baud. Change pins/baud in `idf.py menuconfig` under **Modem UART transport**.
+UART for the modem is configured in **`main/main.c`** from **Modem UART transport** in `menuconfig` (port, pins, baud, buffers). Optional **PWRKEY** GPIO lives in the same menu and is driven by [components/modem_uart](components/modem_uart).
 
 ## Configuration (`menuconfig`)
 
-- **Modem UART transport** — port, TX/RX GPIO, baud, RX buffer size, optional **PWRKEY** GPIO pulse on boot.
-- **AT client** — task stack, queue depth, default timeout, max line/aggregate lengths, retries.
-- **SIM7000 modem** — default APN string, whether to run PDP attach in `sim7000_bringup()`, PDP CID.
+- **Modem UART transport** — UART port/pins/baud/buffers for **esp_modem**; optional **PWRKEY**.
+- **SIM7000 modem** — default APN, PDP bring-up options, AT timeout/response size for `sim7000_bringup()`.
 
 ## NVS: APN
 
-Namespace `modem`, key `apn` (string). If missing, the firmware uses **SIM7000 default APN** from Kconfig (`CONFIG_SIM7000_DEFAULT_APN`).
+Namespace `modem`, key `apn` (string). If missing, firmware uses **SIM7000 default APN** from Kconfig (`CONFIG_SIM7000_DEFAULT_APN`).
 
-Use `modem_config_save_apn()` from [components/sim7000/include/modem_config.h](components/sim7000/include/modem_config.h) in your provisioning code to persist a carrier APN.
+Use `modem_config_save_apn()` from [components/sim7000/include/modem_config.h](components/sim7000/include/modem_config.h) in provisioning code.
 
 ## Project layout
 
 | Component | Role |
 |-----------|------|
-| [components/modem_uart](components/modem_uart) | UART install, drain, read/write, optional PWRKEY |
-| [components/at_client](components/at_client) | FreeRTOS task + queue + mutex; sync `AT` commands; URC callback |
-| [components/sim7000](components/sim7000) | `sim7000_bringup()` (ID, SIM, registration, optional PDP), NVS helpers |
-| [main/main.c](main/main.c) | Init, bring-up, periodic `AT` heartbeat |
+| [components/modem_uart](components/modem_uart) | PWRKEY GPIO only (UART owned by esp_modem) |
+| [components/sim7000](components/sim7000) | `sim7000_bringup()` via esp_modem AT API, NVS APN helpers |
+| [main/main.c](main/main.c) | Netif/event init, esp_modem DCE, PPP data mode, IP wait, fallbacks |
 
-## IP / PPP / MQTT (next step)
+Managed dependency: **espressif/esp_modem** (see `main/idf_component.yml`). Do not maintain patches under `managed_components/` (see `.cursor/rules/esp-idf-managed-components.mdc`); vendor or fork if you need upstream changes.
 
-AT-only bring-up does not put TCP/IP on the ESP32. See [components/sim7000/DATA_PATH.md](components/sim7000/DATA_PATH.md) for PPP and **esp-modem** notes.
+## IP / PPP / applications
+
+See [components/sim7000/DATA_PATH.md](components/sim7000/DATA_PATH.md) for PPP notes, IPv6, and reset behavior.

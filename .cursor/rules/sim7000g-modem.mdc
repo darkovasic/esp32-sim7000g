@@ -33,10 +33,10 @@ Defaults live in `sdkconfig.defaults` and **Modem UART transport** / **SIM7000 m
 
 | Setting | Default in tree |
 |---------|------------------|
-| UART | **UART2**, TX GPIO **17** → modem RX, RX GPIO **16** ← modem TX |
-| Line | **115200** baud, **8N1**, **no hardware flow control** (`modem_uart.c`) |
-| PWRKEY | **Disabled** unless `CONFIG_MODEM_PWRKEY_ENABLE`; then GPIO from Kconfig (default **4**, active low) — see `main/main.c` |
-| PDP / APN | `AT+CGDCONT` / `AT+CGACT` via `sim7000_bringup()` when `CONFIG_SIM7000_BRINGUP_PDP`; APN from NVS `modem` / `apn` or `CONFIG_SIM7000_DEFAULT_APN` |
+| UART | **UART2**, TX GPIO **17** → modem RX, RX GPIO **16** ← modem TX — **esp_modem** DTE in `main/main.c` (Kconfig: Modem UART transport) |
+| Line | **115200** baud, **8N1**, **no hardware flow control** |
+| PWRKEY | **Disabled** unless `CONFIG_MODEM_PWRKEY_ENABLE`; then GPIO from Kconfig (default **4**, active low) — `modem_uart` component + `main/main.c` |
+| PDP / APN | `AT+CGDCONT` / optional `AT+CGACT` via `sim7000_bringup()` when `CONFIG_SIM7000_BRINGUP_PDP`; APN from NVS `modem` / `apn` or `CONFIG_SIM7000_DEFAULT_APN` |
 
 Cross-check with the ESP32 rule: **UART2 = GPIO 16/17** on DevKitC V4 matches the modem UART defaults above.
 

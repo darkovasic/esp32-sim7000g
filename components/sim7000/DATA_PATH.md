@@ -10,7 +10,7 @@ To get **TCP/IP on the ESP32** (MQTT, HTTPS, etc.), you typically:
 
 3. **Custom stack** — Implement or port PPP + LWIP integration; higher maintenance.
 
-**Recommendation:** When you need IP on the MCU, add `esp_modem` (or IDF’s PPP examples) as a separate phase, keep `at_client` for configuration/diagnostics, and avoid mixing raw AT writes with PPP bytes on the same UART without a clear mode switch.
+**This project:** `main` uses **esp_modem** for the UART DTE, AT (`esp_modem_at` / `esp_modem_sync`), PPP data mode, and `esp_netif`. `sim7000_bringup()` runs identification / registration / optional PDP over that API. Do not drive the modem UART with a second owner while PPP is up.
 
 ## `managed_components` and customizing esp_modem
 
