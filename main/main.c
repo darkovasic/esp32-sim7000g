@@ -7,7 +7,9 @@
 
 #include "at_client.h"
 #include "esp_app_desc.h"
+#include "esp_event.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "modem_config.h"
@@ -29,6 +31,9 @@ void app_main(void)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
+
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     char apn[64];
     esp_err_t apn_err = modem_config_load_apn(apn, sizeof(apn));
