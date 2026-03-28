@@ -1,0 +1,5 @@
+## Project-level managed dependencies (ESP-IDF Component Manager)
+dependencies:
+  idf:
+    version: '>=5.0'
+  espressif/esp_modem: '2.0.1'
