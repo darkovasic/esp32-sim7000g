@@ -1,5 +1,5 @@
-## Project-level managed dependencies (ESP-IDF Component Manager)
+## Project-level Component Manager metadata.
+## esp_modem is declared in main/idf_component.yml so CMake can resolve main's REQUIRES espressif__esp_modem.
 dependencies:
   idf:
     version: '>=5.0'
-  espressif/esp_modem: '2.0.1'

@@ -1,0 +1,5 @@
+## Managed deps for `main` (ensures esp_modem is fetched before CMake resolves REQUIRES).
+dependencies:
+  idf:
+    version: '>=5.0'
+  espressif/esp_modem: '2.0.1'
