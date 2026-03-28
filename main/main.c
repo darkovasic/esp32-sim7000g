@@ -20,6 +20,11 @@
 
 static const char *TAG = "app";
 
+#if CONFIG_LWIP_PPP_SUPPORT
+/** PPP esp_netif for cellular data; driver attaches in a later migration step (esp_modem). */
+static esp_netif_t *s_ppp_netif;
+#endif
+
 void app_main(void)
 {
     const esp_app_desc_t *app = esp_app_get_description();
@@ -34,6 +39,18 @@ void app_main(void)
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+#if CONFIG_LWIP_PPP_SUPPORT
+    esp_netif_config_t ppp_cfg = ESP_NETIF_DEFAULT_PPP();
+    s_ppp_netif = esp_netif_new(&ppp_cfg);
+    if (s_ppp_netif == NULL) {
+        ESP_LOGE(TAG, "esp_netif_new(PPP) failed");
+        abort();
+    }
+    ESP_LOGI(TAG, "PPP esp_netif created (%s) — no I/O driver yet", esp_netif_get_desc(s_ppp_netif));
+#else
+    ESP_LOGW(TAG, "CONFIG_LWIP_PPP_SUPPORT disabled — skip PPP esp_netif");
+#endif
 
     char apn[64];
     esp_err_t apn_err = modem_config_load_apn(apn, sizeof(apn));
