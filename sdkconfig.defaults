@@ -8,3 +8,17 @@
 
 # Default IDF main stack is 3584; modest headroom for richer AT / future PPP without menuconfig.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
+
+# Modem UART (DevKitC-style: UART2, TX=17, RX=16). Override in menuconfig for other boards.
+CONFIG_MODEM_UART_PORT_NUM=2
+CONFIG_MODEM_UART_TX_GPIO=17
+CONFIG_MODEM_UART_RX_GPIO=16
+CONFIG_MODEM_UART_BAUD_RATE=115200
+CONFIG_MODEM_UART_RX_BUF_SIZE=4096
+
+# AT client defaults (timeouts/retries also adjustable in menuconfig).
+CONFIG_AT_CLIENT_DEFAULT_TIMEOUT_MS=3000
+CONFIG_AT_CLIENT_DEFAULT_RETRIES=2
+
+# SIM7000: default APN when NVS namespace `modem` / key `apn` is unset.
+CONFIG_SIM7000_DEFAULT_APN="internet"

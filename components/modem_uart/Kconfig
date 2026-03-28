@@ -1,0 +1,51 @@
+menu "Modem UART transport"
+
+    config MODEM_UART_PORT_NUM
+        int "UART port number (ESP32: 0-2)"
+        range 0 2
+        default 2
+        help
+            UART controller connected to the modem (e.g. UART2 on DevKitC).
+
+    config MODEM_UART_TX_GPIO
+        int "TX GPIO (ESP32 -> modem RX)"
+        range -1 48
+        default 17
+        help
+            Set to -1 only for unusual wiring; default matches many DevKitC + modem shields.
+
+    config MODEM_UART_RX_GPIO
+        int "RX GPIO (modem TX -> ESP32)"
+        range -1 48
+        default 16
+
+    config MODEM_UART_BAUD_RATE
+        int "Baud rate"
+        default 115200
+
+    config MODEM_UART_RX_BUF_SIZE
+        int "UART RX ring buffer size (bytes)"
+        default 4096
+
+    config MODEM_UART_TX_BUF_SIZE
+        int "UART TX ring buffer size (bytes, 0 = minimal)"
+        default 0
+
+    config MODEM_PWRKEY_ENABLE
+        bool "Drive modem PWRKEY from GPIO"
+        default n
+        help
+            Pulse PWRKEY low/high per board schematic to power-cycle the modem.
+
+    config MODEM_PWRKEY_GPIO
+        int "PWRKEY GPIO (active level below)"
+        depends on MODEM_PWRKEY_ENABLE
+        range 0 48
+        default 4
+
+    config MODEM_PWRKEY_ACTIVE_LOW
+        bool "PWRKEY is active low"
+        depends on MODEM_PWRKEY_ENABLE
+        default y
+
+endmenu

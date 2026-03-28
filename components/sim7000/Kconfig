@@ -1,0 +1,20 @@
+menu "SIM7000 modem"
+
+    config SIM7000_DEFAULT_APN
+        string "Default APN (used if NVS key modem/apn is unset)"
+        default "internet"
+        help
+            Stored APN in NVS overrides this. Set your carrier APN for automatic PDP.
+
+    config SIM7000_BRINGUP_PDP
+        bool "Attach PDP context during sim7000_bringup()"
+        default y
+        help
+            If disabled, only SIM + registration checks run (useful for UART-only lab).
+
+    config SIM7000_PDP_CID
+        int "PDP context id (CID)"
+        range 1 16
+        default 1
+
+endmenu
