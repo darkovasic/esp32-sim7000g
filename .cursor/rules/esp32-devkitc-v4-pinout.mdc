@@ -1,0 +1,69 @@
+---
+description: ESP32 DevKitC V4 (WROOM-32D) pinout — default peripheral GPIO map and constraints
+alwaysApply: true
+---
+
+# Hardware context: ESP32 DevKitC V4
+
+Board: **ESP32 DevKitC V4**, module **ESP32-WROOM-32D**. Full diagram: `docs/esp32-devkitc-v4-pinout.png`.
+
+## Default buses (typical wiring / ESP-IDF defaults)
+
+| Bus | Role | GPIO |
+|-----|------|------|
+| UART0 | USB serial debug | TX **1**, RX **3** |
+| UART2 | Second UART | TX **17**, RX **16** |
+| I2C | SDA / SCL | **21** / **22** |
+| SPI (VSPI) | MOSI / MISO / SCK / CS | **23** / **19** / **18** / **5** |
+| DAC | DAC1 / DAC2 | **25** / **26** |
+
+## ADC note
+
+With **Wi-Fi on**, **ADC2** GPIOs are unreliable; use **ADC1** (e.g. 32–39; 34–39 are input-only).
+
+## Input-only (no internal pull-up/down)
+
+**34, 35, 36, 39** — use only as inputs (e.g. ADC1).
+
+## Flash / PSRAM strapping — avoid for GPIO
+
+**6, 7, 8, 9, 10, 11** — tied to internal flash; do not use as user GPIO.
+
+## Boot / strapping (use with care)
+
+**0, 2, 12, 15** — affect boot mode or flash voltage; OK with correct pull levels at reset.
+
+## Left header (top → bottom)
+
+| Pin label | Notes |
+|-----------|--------|
+| 3V3, EN, GND, 5V | Power / reset |
+| 36 | ADC1_0, input-only |
+| 39 | ADC1_3, input-only |
+| 34 | ADC1_6, input-only |
+| 35 | ADC1_7, input-only |
+| 32, 33 | ADC1, touch, 32k crystal pads |
+| 25, 26 | ADC2, DAC1/2 |
+| 27 | ADC2, touch |
+| 14, 12, 13 | ADC2, touch, HSPI (12 strapping) |
+| 9–11 | UART1 / flash — **do not use** |
+| GND | |
+
+## Right header (top → bottom)
+
+| Pin label | Notes |
+|-----------|--------|
+| GND | |
+| 23, 22, 21 | VSPI MOSI; SCL + RTS0; SDA |
+| 1, 3 | UART0 TX/RX (console) |
+| GND | |
+| 19, 18, 5 | VSPI MISO, CLK, CS |
+| 17, 16 | UART2 TX/RX |
+| 4, 0, 2, 15 | ADC2, touch; 0/2/15 strapping |
+| 8, 7, 6 | Flash — **do not use** |
+
+## Touch (if needed)
+
+Touch0–Touch9 map to GPIO **4, 0, 2, 15, 13, 12, 14, 27, 33, 32** (Touch0 … Touch9).
+
+When suggesting pins for UART to modem, sensors, or LEDs, prefer **UART2 (16/17)** or other free GPIOs, and **never** suggest **6–11** for general I/O.

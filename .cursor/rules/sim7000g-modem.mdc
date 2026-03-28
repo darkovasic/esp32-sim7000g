@@ -1,0 +1,43 @@
+---
+description: SIM7000G module specs + BK-SIM7000G breakout; aligns with this repo’s UART/APN usage
+alwaysApply: true
+---
+
+# Modem hardware: SIM7000G (+ breakout context)
+
+## Breakout board (this project’s reference hardware)
+
+Vendor listing: [AND-Global BK-SIM7000G breakout](https://www.and-global.com/list_25/575.html) — SIM7000G core/breakout kit (model **BK-SIM7000G**), typically bundled with cellular and GPS antennas. Pinout and exact net names follow **your breakout silkscreen / schematic**, not only the bare module.
+
+## SIM7000G module (SIMCom) — summary
+
+| Topic | Detail |
+|-------|--------|
+| Form factor | **LCC** (compatible footprint with **SIM900** / **SIM800F** class layouts) |
+| Radio | Global **LTE-FDD / TDD-LTE**, **quad-band GPRS/EDGE** |
+| LPWA | **LTE Cat-M1 (eMTC)** and **NB-IoT**; product copy cites up to **~375 kbps** class throughput (real throughput depends on network/RAT) |
+| GSM | **850 / 900 / 1800 / 1900 MHz** |
+| LTE Cat-M bands (listing) | B1, B2, B3, B4, B5, B8, B12, B13, B17, B18, B19, B20, B25, B26, B28, B39 |
+| NB-IoT bands (listing) | Same set as Cat-M on the product page |
+| Host interfaces | **UART**, **USB 2.0**, **GPIO** (breakout may only break out a subset) |
+| Control | **AT** command set — **largely compatible with SIM800F** (still verify SIM7000G-specific LTE/NB commands in SIMCom docs) |
+| Power saving | **PSM**, **eDRX** (for long battery-life designs) |
+
+## Authoritative documentation (in this repo)
+
+**`docs/sim7000g_user_manual.pdf`** — SIM7000G user manual from SIMCom. Treat this as the source for **absolute electrical limits**, **pin / interface assignments**, **power-on timing**, UART/USB notes, and the **full AT command set**. The [AND-Global breakout listing](https://www.and-global.com/list_25/575.html) is handy for the kit; it does **not** replace the module manual.
+
+## How **this repository** talks to the modem
+
+Defaults live in `sdkconfig.defaults` and **Modem UART transport** / **SIM7000 modem** in `idf.py menuconfig`:
+
+| Setting | Default in tree |
+|---------|------------------|
+| UART | **UART2**, TX GPIO **17** → modem RX, RX GPIO **16** ← modem TX |
+| Line | **115200** baud, **8N1**, **no hardware flow control** (`modem_uart.c`) |
+| PWRKEY | **Disabled** unless `CONFIG_MODEM_PWRKEY_ENABLE`; then GPIO from Kconfig (default **4**, active low) — see `main/main.c` |
+| PDP / APN | `AT+CGDCONT` / `AT+CGACT` via `sim7000_bringup()` when `CONFIG_SIM7000_BRINGUP_PDP`; APN from NVS `modem` / `apn` or `CONFIG_SIM7000_DEFAULT_APN` |
+
+Cross-check with the ESP32 rule: **UART2 = GPIO 16/17** on DevKitC V4 matches the modem UART defaults above.
+
+When changing pins or baud, update **Kconfig** / `sdkconfig` and keep **modem TX ↔ ESP RX** and **modem RX ↔ ESP TX** crossed.
