@@ -6,6 +6,8 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_modem_api.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "sim7000";
@@ -85,4 +87,71 @@ esp_err_t sim7000_bringup(esp_modem_dce_t *dce, const sim7000_config_t *cfg)
 #endif
 
     return ESP_OK;
+}
+
+/** Parse +CREG/+CGREG/+CEREG n,stat from aggregated AT response; returns stat or -1 if missing. */
+static int sim7000_reg_stat(const char *resp, const char *prefix)
+{
+    const char *p = strstr(resp, prefix);
+    if (p == NULL) {
+        return -1;
+    }
+    p += strlen(prefix);
+    while (*p == ' ' || *p == '\t') {
+        p++;
+    }
+    int n = 0;
+    int stat = -1;
+    if (sscanf(p, "%d,%d", &n, &stat) >= 2) {
+        return stat;
+    }
+    return -1;
+}
+
+static bool sim7000_is_registered_stat(int stat)
+{
+    return stat == 1 || stat == 5;
+}
+
+esp_err_t sim7000_wait_for_network_registration(esp_modem_dce_t *dce)
+{
+#if !CONFIG_SIM7000_WAIT_FOR_REGISTRATION
+    (void)dce;
+    return ESP_OK;
+#else
+    char resp[CONFIG_SIM7000_AT_RESP_MAX_LEN];
+    const uint32_t poll_ms = (uint32_t)CONFIG_SIM7000_REGISTRATION_POLL_MS;
+    const uint32_t timeout_ms = (uint32_t)CONFIG_SIM7000_REGISTRATION_TIMEOUT_MS;
+    const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(timeout_ms);
+
+    ESP_LOGI(TAG, "Waiting for network registration (poll %lu ms, timeout %lu ms)",
+             (unsigned long)poll_ms, (unsigned long)timeout_ms);
+
+    while (xTaskGetTickCount() < deadline) {
+        int creg = -1;
+        int cgreg = -1;
+        int cereg = -1;
+
+        if (esp_modem_at(dce, "AT+CREG?", resp, CONFIG_SIM7000_AT_TIMEOUT_MS) == ESP_OK) {
+            creg = sim7000_reg_stat(resp, "+CREG:");
+        }
+        if (esp_modem_at(dce, "AT+CGREG?", resp, CONFIG_SIM7000_AT_TIMEOUT_MS) == ESP_OK) {
+            cgreg = sim7000_reg_stat(resp, "+CGREG:");
+        }
+        if (esp_modem_at(dce, "AT+CEREG?", resp, CONFIG_SIM7000_AT_TIMEOUT_MS) == ESP_OK) {
+            cereg = sim7000_reg_stat(resp, "+CEREG:");
+        }
+
+        if (sim7000_is_registered_stat(creg) || sim7000_is_registered_stat(cgreg) ||
+            sim7000_is_registered_stat(cereg)) {
+            ESP_LOGI(TAG, "Registered: CREG=%d CGREG=%d CEREG=%d", creg, cgreg, cereg);
+            return ESP_OK;
+        }
+
+        ESP_LOGI(TAG, "Still searching (CREG=%d CGREG=%d CEREG=%d)", creg, cgreg, cereg);
+        vTaskDelay(pdMS_TO_TICKS(poll_ms));
+    }
+
+    return ESP_ERR_TIMEOUT;
+#endif
 }

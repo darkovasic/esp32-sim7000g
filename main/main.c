@@ -173,6 +173,15 @@ void app_main(void)
         ESP_LOGW(TAG, "Bring-up incomplete: %s — PPP may still fail", esp_err_to_name(err));
     }
 
+#if CONFIG_SIM7000_WAIT_FOR_REGISTRATION
+    err = sim7000_wait_for_network_registration(s_dce);
+    if (err == ESP_ERR_TIMEOUT) {
+        ESP_LOGW(TAG, "Registration wait timed out — attempting PPP anyway");
+    } else if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Registration wait: %s — attempting PPP anyway", esp_err_to_name(err));
+    }
+#endif
+
     s_conn_events = xEventGroupCreate();
     if (s_conn_events == NULL) {
         ESP_LOGE(TAG, "EventGroupCreate failed");

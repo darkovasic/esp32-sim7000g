@@ -36,4 +36,26 @@ menu "SIM7000 modem"
         range 256 2048
         default 512
 
+    config SIM7000_WAIT_FOR_REGISTRATION
+        bool "Wait for network registration before PPP data mode"
+        default y
+        help
+            When the ESP32 and modem power up together, the SIM can take tens of seconds to
+            register while the MCU is already running AT + PPP. If PPP starts while CREG/CEREG
+            still show \"searching\" (stat 2), LCP/IPCP often times out. This option polls
+            AT+CREG? / AT+CGREG? / AT+CEREG? until stat is registered (1 or 5) or the timeout
+            below is reached.
+
+    config SIM7000_REGISTRATION_POLL_MS
+        int "Registration poll interval (ms)"
+        depends on SIM7000_WAIT_FOR_REGISTRATION
+        default 3000
+        range 1000 60000
+
+    config SIM7000_REGISTRATION_TIMEOUT_MS
+        int "Max wait for registration before PPP (ms)"
+        depends on SIM7000_WAIT_FOR_REGISTRATION
+        default 120000
+        range 10000 600000
+
 endmenu

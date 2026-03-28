@@ -30,7 +30,7 @@ UART for the modem is configured in **`main/main.c`** from **Modem UART transpor
 ## Configuration (`menuconfig`)
 
 - **Modem UART transport** — UART port/pins/baud/buffers for **esp_modem**; optional **PWRKEY**.
-- **SIM7000 modem** — default APN, PDP bring-up options, AT timeout/response size for `sim7000_bringup()`.
+- **SIM7000 modem** — default APN, PDP bring-up options, AT timeout/response size, and **wait for network registration** before PPP (helps cold boot when the modem needs tens of seconds to attach).
 
 ## NVS: APN
 

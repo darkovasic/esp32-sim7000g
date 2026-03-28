@@ -23,6 +23,10 @@ CONFIG_MODEM_UART_RX_BUF_SIZE=4096
 
 # SIM7000 bring-up AT timeouts / response buffer (menuconfig: SIM7000 modem).
 CONFIG_SIM7000_AT_TIMEOUT_MS=3000
+# Cold boot: wait for CREG/CEREG registered before PPP (see sim7000_wait_for_network_registration).
+CONFIG_SIM7000_WAIT_FOR_REGISTRATION=y
+CONFIG_SIM7000_REGISTRATION_POLL_MS=3000
+CONFIG_SIM7000_REGISTRATION_TIMEOUT_MS=120000
 
 # SIM7000: default APN when NVS namespace `modem` / key `apn` is unset.
 CONFIG_SIM7000_DEFAULT_APN="internet"

@@ -17,6 +17,13 @@ typedef struct {
  */
 esp_err_t sim7000_bringup(esp_modem_dce_t *dce, const sim7000_config_t *cfg);
 
+/**
+ * Poll network registration until CREG, CGREG, or CEREG reports stat 1 (home) or 5 (roaming),
+ * or until timeout. Intended after sim7000_bringup() and before esp_modem DATA/PPP when the
+ * modem may still be searching (cold boot with SIM).
+ */
+esp_err_t sim7000_wait_for_network_registration(esp_modem_dce_t *dce);
+
 #ifdef __cplusplus
 }
 #endif
