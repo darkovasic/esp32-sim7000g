@@ -182,6 +182,8 @@ void app_main(void)
     }
 #endif
 
+    sim7000_log_signal_quality_once(s_dce);
+
     s_conn_events = xEventGroupCreate();
     if (s_conn_events == NULL) {
         ESP_LOGE(TAG, "EventGroupCreate failed");

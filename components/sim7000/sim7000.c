@@ -155,3 +155,33 @@ esp_err_t sim7000_wait_for_network_registration(esp_modem_dce_t *dce)
     return ESP_ERR_TIMEOUT;
 #endif
 }
+
+void sim7000_log_signal_quality_once(esp_modem_dce_t *dce)
+{
+    char resp[CONFIG_SIM7000_AT_RESP_MAX_LEN];
+    esp_err_t e = esp_modem_at(dce, "AT+CSQ", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
+    if (e != ESP_OK) {
+        ESP_LOGW(TAG, "AT+CSQ failed: %s", esp_err_to_name(e));
+        return;
+    }
+    const char *p = strstr(resp, "+CSQ:");
+    if (p == NULL) {
+        ESP_LOGW(TAG, "AT+CSQ: no +CSQ: in response: %s", resp[0] ? resp : "(empty)");
+        return;
+    }
+    p += strlen("+CSQ:");
+    while (*p == ' ' || *p == '\t') {
+        p++;
+    }
+    int rssi = -1;
+    int ber = -1;
+    if (sscanf(p, "%d,%d", &rssi, &ber) < 2) {
+        ESP_LOGW(TAG, "AT+CSQ: parse failed: %s", resp);
+        return;
+    }
+    if (rssi == 99) {
+        ESP_LOGI(TAG, "Signal (CSQ): RSSI unknown (99), BER=%d", ber);
+    } else {
+        ESP_LOGI(TAG, "Signal (CSQ): RSSI=%d (0–31 scale, 99=unknown), BER=%d", rssi, ber);
+    }
+}

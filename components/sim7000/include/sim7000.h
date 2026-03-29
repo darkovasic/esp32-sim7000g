@@ -24,6 +24,11 @@ esp_err_t sim7000_bringup(esp_modem_dce_t *dce, const sim7000_config_t *cfg);
  */
 esp_err_t sim7000_wait_for_network_registration(esp_modem_dce_t *dce);
 
+/**
+ * Log AT+CSQ once (command mode). Safe to call after bring-up / registration, before PPP data mode.
+ */
+void sim7000_log_signal_quality_once(esp_modem_dce_t *dce);
+
 #ifdef __cplusplus
 }
 #endif
