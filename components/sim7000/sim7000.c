@@ -1,5 +1,6 @@
 #include "sim7000.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -25,6 +26,79 @@ static esp_err_t cmd_ok(esp_modem_dce_t *dce, const char *c)
         ESP_LOGI(TAG, "%s => %s", c, resp);
     }
     return e;
+}
+
+/** TS 27.007 +CESQ; returns true if a valid +CESQ line was logged. */
+static bool sim7000_try_log_cesq(esp_modem_dce_t *dce, char *resp)
+{
+    esp_err_t e = esp_modem_at(dce, "AT+CESQ?", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
+    if (e != ESP_OK) {
+        e = esp_modem_at(dce, "AT+CESQ", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
+    }
+    if (e != ESP_OK) {
+        return false;
+    }
+    const char *cesq = strstr(resp, "+CESQ:");
+    if (cesq == NULL) {
+        return false;
+    }
+    cesq += strlen("+CESQ:");
+    while (*cesq == ' ' || *cesq == '\t') {
+        cesq++;
+    }
+    int rxlev = -1;
+    int ber_g = -1;
+    int rscp = -1;
+    int ecno = -1;
+    int rsrq = -1;
+    int rsrp = -1;
+    if (sscanf(cesq, "%d,%d,%d,%d,%d,%d", &rxlev, &ber_g, &rscp, &ecno, &rsrq, &rsrp) != 6) {
+        return false;
+    }
+    ESP_LOGI(TAG, "Signal (CESQ): rxlev=%d ber=%d rscp=%d ecno=%d rsrq=%d rsrp=%d (TS 27.007)", rxlev,
+             ber_g, rscp, ecno, rsrq, rsrp);
+    if (rsrp != 255) {
+        if (rsrp == 0) {
+            ESP_LOGI(TAG, "Signal (CESQ): LTE RSRP < -140 dBm (code 0)");
+        } else if (rsrp == 97) {
+            ESP_LOGI(TAG, "Signal (CESQ): LTE RSRP >= -44 dBm (code 97)");
+        } else {
+            ESP_LOGI(TAG, "Signal (CESQ): LTE RSRP ~%d dBm nominal (code %d; band is 1 dB steps)", -140 + rsrp,
+                     rsrp);
+        }
+    }
+    if (rsrq != 255) {
+        ESP_LOGI(TAG, "Signal (CESQ): RSRQ code=%d (0–34, 255=N/A; see TS 27.007 for dB mapping)", rsrq);
+    }
+    return true;
+}
+
+/**
+ * SIM7000 often rejects +CESQ; +CPSI? returns LTE/NB cell info (RSRP/RSRQ-style values in tail — see manual).
+ */
+static void sim7000_try_log_cpsi(esp_modem_dce_t *dce, char *resp)
+{
+    esp_err_t e = esp_modem_at(dce, "AT+CPSI?", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
+    if (e != ESP_OK) {
+        e = esp_modem_at(dce, "AT+CPSI", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
+    }
+    if (e != ESP_OK) {
+        ESP_LOGW(TAG, "LTE detail: AT+CPSI? / AT+CPSI failed (%s) after CESQ unavailable", esp_err_to_name(e));
+        return;
+    }
+    const char *p = strstr(resp, "+CPSI:");
+    if (p == NULL) {
+        ESP_LOGW(TAG, "LTE detail: no +CPSI: in response");
+        return;
+    }
+    char line[240];
+    size_t i = 0;
+    while (p[i] && p[i] != '\r' && p[i] != '\n' && i < sizeof(line) - 1) {
+        line[i] = p[i];
+        i++;
+    }
+    line[i] = '\0';
+    ESP_LOGI(TAG, "Signal (CPSI): %s", line);
 }
 
 esp_err_t sim7000_bringup(esp_modem_dce_t *dce, const sim7000_config_t *cfg)
@@ -159,29 +233,33 @@ esp_err_t sim7000_wait_for_network_registration(esp_modem_dce_t *dce)
 void sim7000_log_signal_quality_once(esp_modem_dce_t *dce)
 {
     char resp[CONFIG_SIM7000_AT_RESP_MAX_LEN];
+
     esp_err_t e = esp_modem_at(dce, "AT+CSQ", resp, CONFIG_SIM7000_AT_TIMEOUT_MS);
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "AT+CSQ failed: %s", esp_err_to_name(e));
-        return;
-    }
-    const char *p = strstr(resp, "+CSQ:");
-    if (p == NULL) {
-        ESP_LOGW(TAG, "AT+CSQ: no +CSQ: in response: %s", resp[0] ? resp : "(empty)");
-        return;
-    }
-    p += strlen("+CSQ:");
-    while (*p == ' ' || *p == '\t') {
-        p++;
-    }
-    int rssi = -1;
-    int ber = -1;
-    if (sscanf(p, "%d,%d", &rssi, &ber) < 2) {
-        ESP_LOGW(TAG, "AT+CSQ: parse failed: %s", resp);
-        return;
-    }
-    if (rssi == 99) {
-        ESP_LOGI(TAG, "Signal (CSQ): RSSI unknown (99), BER=%d", ber);
     } else {
-        ESP_LOGI(TAG, "Signal (CSQ): RSSI=%d (0–31 scale, 99=unknown), BER=%d", rssi, ber);
+        const char *p = strstr(resp, "+CSQ:");
+        if (p == NULL) {
+            ESP_LOGW(TAG, "AT+CSQ: no +CSQ: in response: %s", resp[0] ? resp : "(empty)");
+        } else {
+            p += strlen("+CSQ:");
+            while (*p == ' ' || *p == '\t') {
+                p++;
+            }
+            int rssi = -1;
+            int ber = -1;
+            if (sscanf(p, "%d,%d", &rssi, &ber) < 2) {
+                ESP_LOGW(TAG, "AT+CSQ: parse failed: %s", resp);
+            } else if (rssi == 99) {
+                ESP_LOGI(TAG, "Signal (CSQ): RSSI unknown (99), BER=%d", ber);
+            } else {
+                ESP_LOGI(TAG, "Signal (CSQ): RSSI=%d (0–31 scale, 99=unknown), BER=%d", rssi, ber);
+            }
+        }
+    }
+
+    if (!sim7000_try_log_cesq(dce, resp)) {
+        ESP_LOGI(TAG, "Signal: +CESQ not available; logging +CPSI (SIM7000 LTE detail)");
+        sim7000_try_log_cpsi(dce, resp);
     }
 }
