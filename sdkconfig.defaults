@@ -30,3 +30,8 @@ CONFIG_SIM7000_REGISTRATION_TIMEOUT_MS=120000
 
 # SIM7000: default APN when NVS namespace `modem` / key `apn` is unset.
 CONFIG_SIM7000_DEFAULT_APN="internet"
+
+# Readings API: base URL + device_id defaults; API key must be stored in NVS readings/api_key.
+CONFIG_READINGS_UPLOAD_ENABLE=y
+CONFIG_READINGS_API_BASE_URL="https://api.bedrocklabs.online"
+CONFIG_READINGS_DEVICE_ID="esp32-001"

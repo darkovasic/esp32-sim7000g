@@ -1,0 +1,49 @@
+menu "Readings API (HTTP upload)"
+
+    config READINGS_UPLOAD_ENABLE
+        bool "POST /data once after PPP obtains an IP"
+        default y
+        help
+            When enabled, after cellular PPP gets an address the firmware sends one HTTPS POST
+            with JSON {device_id, value} to <base>/data. Requires NVS key readings/api_key.
+
+    config READINGS_API_BASE_URL
+        string "Default API base URL (https://host, no path; optional trailing slash)"
+        default "https://api.bedrocklabs.online"
+        depends on READINGS_UPLOAD_ENABLE
+        help
+            Full POST URL is this value with "/data" appended. NVS key readings/api_base overrides
+            when set.
+
+    config READINGS_DEVICE_ID
+        string "Default device_id in JSON body"
+        default "esp32-001"
+        depends on READINGS_UPLOAD_ENABLE
+        help
+            Must be 1-255 characters after trim; use letters, numbers, hyphen. NVS readings/device_id
+            overrides when set.
+
+    config READINGS_HTTP_TIMEOUT_MS
+        int "HTTPS client timeout (ms)"
+        depends on READINGS_UPLOAD_ENABLE
+        default 60000
+        range 5000 120000
+
+    config READINGS_PROVISION_API_KEY_ON_BOOT
+        bool "One-shot: write API key from the string below into NVS on boot"
+        default n
+        depends on READINGS_UPLOAD_ENABLE
+        help
+            When enabled, after nvs_flash_init the firmware calls readings_config_save_api_key()
+            with READINGS_PROVISION_API_KEY_VALUE. Flash once, confirm NVS, then turn this OFF
+            so the key is not rebuilt into every image. Do not commit sdkconfig if it contains
+            a non-empty key string.
+
+    config READINGS_PROVISION_API_KEY_VALUE
+        string "API key to write to NVS (readings/api_key)"
+        default ""
+        depends on READINGS_PROVISION_API_KEY_ON_BOOT
+        help
+            Same value as server API_KEY. Leave empty when provisioning is disabled.
+
+endmenu

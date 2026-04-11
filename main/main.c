@@ -10,12 +10,15 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "modem_config.h"
 #include "modem_uart.h"
 #include "nvs_flash.h"
+#include "readings_config.h"
+#include "readings_upload.h"
 #include "sim7000.h"
 #include "sdkconfig.h"
 
@@ -89,6 +92,22 @@ void app_main(void)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
+
+#if CONFIG_READINGS_UPLOAD_ENABLE && CONFIG_READINGS_PROVISION_API_KEY_ON_BOOT
+    if (CONFIG_READINGS_PROVISION_API_KEY_VALUE[0] != '\0') {
+        err = readings_config_save_api_key(CONFIG_READINGS_PROVISION_API_KEY_VALUE);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG,
+                     "NVS: stored readings/api_key from Kconfig — disable "
+                     "READINGS_PROVISION_API_KEY_ON_BOOT and clear the key string, then rebuild");
+        } else {
+            ESP_LOGE(TAG, "NVS: failed to store readings/api_key: %s", esp_err_to_name(err));
+        }
+    } else {
+        ESP_LOGW(TAG, "READINGS_PROVISION_API_KEY_ON_BOOT is set but READINGS_PROVISION_API_KEY_VALUE "
+                      "is empty");
+    }
+#endif
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -217,6 +236,28 @@ void app_main(void)
         (void)esp_modem_set_mode(s_dce, ESP_MODEM_MODE_COMMAND);
         goto command_heartbeat;
     }
+
+#if CONFIG_READINGS_UPLOAD_ENABLE
+    {
+        char api_key[256];
+        char base_url[160];
+        char dev_id[256];
+        esp_err_t cf = readings_config_load(api_key, sizeof(api_key), base_url, sizeof(base_url), dev_id,
+                                            sizeof(dev_id));
+        if (cf != ESP_OK) {
+            ESP_LOGW(TAG,
+                     "Readings API: missing NVS %s/%s (%s) — skip upload. "
+                     "Provision once with readings_config_save_api_key() or nvs_set_str.",
+                     READINGS_NVS_NAMESPACE, READINGS_NVS_KEY_API_KEY, esp_err_to_name(cf));
+        } else {
+            double uptime_s = (double)(esp_timer_get_time() / 1000000LL);
+            esp_err_t up = readings_upload_post(api_key, base_url, dev_id, uptime_s);
+            if (up != ESP_OK) {
+                ESP_LOGW(TAG, "Readings upload failed: %s", esp_err_to_name(up));
+            }
+        }
+    }
+#endif
 
     ESP_LOGI(TAG, "PPP session up; UART is PPP-framed (no AT sync here). Waiting on IP_EVENT / link loss…");
 
