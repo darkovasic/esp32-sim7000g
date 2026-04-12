@@ -9,6 +9,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -91,6 +92,12 @@ void app_main(void)
 {
     const esp_app_desc_t *app = esp_app_get_description();
     ESP_LOGI(TAG, "Firmware %s", app->version);
+
+#if !CONFIG_APP_ENABLE_CELLULAR && CONFIG_APP_DEEP_SLEEP_WHEN_DONE && CONFIG_APP_DEEP_SLEEP_TIMER_SEC > 0
+    if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
+        ESP_LOGI(TAG, "Woke from deep sleep (RTC timer)");
+    }
+#endif
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -306,10 +313,28 @@ command_heartbeat:
 #else /* !CONFIG_APP_ENABLE_CELLULAR */
 
     ESP_LOGI(TAG, "Cellular disabled: no modem / PPP");
+#if CONFIG_APP_DEEP_SLEEP_WHEN_DONE
+#if CONFIG_APP_DEEP_SLEEP_TIMER_SEC > 0
+    {
+        uint64_t us = (uint64_t)CONFIG_APP_DEEP_SLEEP_TIMER_SEC * 1000000ULL;
+        esp_err_t te = esp_sleep_enable_timer_wakeup(us);
+        if (te != ESP_OK) {
+            ESP_LOGE(TAG, "esp_sleep_enable_timer_wakeup failed: %s", esp_err_to_name(te));
+        } else {
+            ESP_LOGI(TAG, "Deep sleep; wake in %u s (RTC timer)", (unsigned)CONFIG_APP_DEEP_SLEEP_TIMER_SEC);
+        }
+    }
+#else
+    ESP_LOGI(TAG, "Deep sleep until EN/reset (timer wake disabled)");
+#endif
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_deep_sleep_start();
+#else
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(30000));
         ESP_LOGI(TAG, "idle");
     }
+#endif
 
 #endif /* CONFIG_APP_ENABLE_CELLULAR */
 }

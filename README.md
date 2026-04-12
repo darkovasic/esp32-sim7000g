@@ -29,7 +29,7 @@ UART for the modem is configured in **`main/main.c`** from **Modem UART transpor
 
 ## Configuration (`menuconfig`)
 
-- **Application** — **Enable SIM7000 cellular** (modem UART + PPP). **Default is off** for Wi‑Fi-only lab or boards without a modem; turn on for cellular field use. Requires **Component config → LWIP → Enable PPP support** when enabled.
+- **Application** — **Enable SIM7000 cellular** (modem UART + PPP). **Default is off** for Wi‑Fi-only lab or boards without a modem; turn on for cellular field use. Requires **Component config → LWIP → Enable PPP support** when enabled. Optional **Deep sleep after boot when cellular is off**; **RTC timer wake** interval in seconds (default **60** when deep sleep is on — set to **0** for sleep until EN/reset only).
 - **Modem UART transport** — UART port/pins/baud/buffers for **esp_modem**; optional **PWRKEY** (used when cellular is enabled).
 - **SIM7000 modem** — default APN, PDP bring-up options, AT timeout/response size, and **wait for network registration** before PPP (helps cold boot when the modem needs tens of seconds to attach).
 - **Readings API (HTTP upload)** — one-shot `POST /data` after IP: **PPP** when cellular is on, or **Wi‑Fi STA** when cellular is off (same AP as lab SNTP if that is enabled, otherwise **Readings Wi‑Fi SSID/password** in menuconfig).

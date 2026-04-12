@@ -8,6 +8,23 @@ menu "Application"
             When disabled, esp_modem, PPP, and SIM bring-up are skipped (Wi-Fi lab SNTP can still run).
             Enable this for field use with the modem. Requires Component config -> LWIP -> Enable PPP support.
 
+    config APP_DEEP_SLEEP_WHEN_DONE
+        bool "Deep sleep after boot when cellular is off"
+        default n
+        depends on !APP_ENABLE_CELLULAR
+        help
+            When cellular is disabled, after Wi-Fi lab SNTP and/or readings STA finishes, enter deep sleep
+            instead of idling. Use APP_DEEP_SLEEP_TIMER_SEC for RTC timer wake (0 = sleep until EN/reset only).
+
+    config APP_DEEP_SLEEP_TIMER_SEC
+        int "RTC timer wake period (seconds); 0 = no timer wake"
+        depends on APP_DEEP_SLEEP_WHEN_DONE
+        default 60
+        range 0 86400
+        help
+            After deep sleep, wake this many seconds later and rerun from boot (e.g. 60 = every minute).
+            0 disables timer wake — chip stays in deep sleep until external reset.
+
 endmenu
 
 menu "Readings API (HTTP upload)"
