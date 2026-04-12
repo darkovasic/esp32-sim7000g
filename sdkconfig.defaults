@@ -1,4 +1,5 @@
 # ESP32 (DevKitC) + SIM7000G UART: see main/main.c (UART2, TX=GPIO17, RX=GPIO16).
+# Cellular is off by default (menuconfig: Application -> Enable SIM7000 cellular).
 # After cloning without sdkconfig: run `idf.py set-target esp32` then `idf.py build`.
 # Refresh this file from your tree anytime: `idf.py save-defconfig` (then re-add comments if needed).
 #
@@ -10,8 +11,8 @@ CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
 # Espressif IoT Development Framework (ESP-IDF) 6.1.0 Project Minimal Configuration
 #
 
-# Default IDF main stack is 3584; modest headroom for richer AT / future PPP without menuconfig.
-CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
+# Main task: Wi-Fi + event delivery + deep app_main; keep headroom (TLS runs on readings_up task).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
 # lwIP PPP — required for ESP_NETIF_DEFAULT_PPP() and esp_modem cellular data path.
 CONFIG_LWIP_PPP_SUPPORT=y
@@ -39,7 +40,4 @@ CONFIG_SIM7000_DEFAULT_APN="internet"
 # CONFIG_LWIP_SNTP_MAX_SERVERS default 1. For faster first sync after reset, disable
 # Component config -> LWIP -> SNTP -> Enable SNTP startup delay (or lower max delay).
 
-# Readings API: base URL + device_id defaults; API key must be stored in NVS readings/api_key.
-CONFIG_READINGS_UPLOAD_ENABLE=y
-CONFIG_READINGS_API_BASE_URL="https://api.bedrocklabs.online"
-CONFIG_READINGS_DEVICE_ID="esp32-001"
+# Readings API defaults live in Kconfig; enable after turning on Application -> Enable SIM7000 cellular.

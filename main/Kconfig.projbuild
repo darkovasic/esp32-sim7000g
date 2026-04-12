@@ -1,11 +1,47 @@
+menu "Application"
+
+    config APP_ENABLE_CELLULAR
+        bool "Enable SIM7000 cellular (modem UART + PPP)"
+        default n
+        depends on LWIP_PPP_SUPPORT
+        help
+            When disabled, esp_modem, PPP, and SIM bring-up are skipped (Wi-Fi lab SNTP can still run).
+            Enable this for field use with the modem. Requires Component config -> LWIP -> Enable PPP support.
+
+endmenu
+
 menu "Readings API (HTTP upload)"
 
     config READINGS_UPLOAD_ENABLE
-        bool "POST /data once after PPP obtains an IP"
+        bool "POST /data once after IP (PPP or Wi-Fi)"
         default y
         help
-            When enabled, after cellular PPP gets an address the firmware sends one HTTPS POST
-            with JSON {device_id, value} to <base>/data. Requires NVS key readings/api_key.
+            After the device has routed internet: one HTTPS POST with JSON {device_id, value} to
+            <base>/data. Requires NVS key readings/api_key.
+            With cellular on: runs after PPP gets an IP. With cellular off: uses Wi-Fi STA — either
+            together with Lab Wi-Fi SNTP (same SSID) or Readings Wi-Fi SSID/password below.
+
+    config READINGS_WIFI_SSID
+        string "Wi-Fi SSID (readings when cellular off, no lab SNTP)"
+        depends on READINGS_UPLOAD_ENABLE
+        default ""
+        help
+            Used only when Application -> Enable SIM7000 cellular is OFF and Lab Wi-Fi SNTP is OFF.
+            Set to your AP SSID for HTTPS upload over Wi-Fi. If Lab Wi-Fi SNTP is enabled, lab SSID
+            is used instead (leave this empty).
+
+    config READINGS_WIFI_PASSWORD
+        string "Wi-Fi password (readings STA)"
+        depends on READINGS_UPLOAD_ENABLE
+        default ""
+        help
+            WPA/WPA2 PSK; empty for open networks. Same scope as READINGS_WIFI_SSID.
+
+    config READINGS_WIFI_CONNECT_TIMEOUT_MS
+        int "Wi-Fi connect timeout for readings STA (ms)"
+        depends on READINGS_UPLOAD_ENABLE
+        default 30000
+        range 5000 120000
 
     config READINGS_API_BASE_URL
         string "Default API base URL (https://host, no path; optional trailing slash)"
@@ -51,12 +87,13 @@ endmenu
 menu "Lab: Wi-Fi time sync (SNTP)"
 
     config LAB_WIFI_SNTP
-        bool "Connect Wi-Fi at boot, SNTP sync, then disconnect (before modem PPP)"
+        bool "Connect Wi-Fi at boot, SNTP sync, then disconnect (before cellular / readings upload)"
         default n
         help
             Lab / development only. Brings up Wi-Fi STA, waits for SNTP to set system time,
-            applies LAB_TZ_POSIX for localtime(), then stops Wi-Fi so cellular PPP is the only
-            data path. Do not enable in production field images unless you intend to use Wi-Fi.
+            applies LAB_TZ_POSIX for localtime(), then stops Wi-Fi. Runs before modem PPP when
+            cellular is on. If cellular is off and Readings upload is on, upload runs on this STA
+            before disconnect. Do not enable in production unless intended.
 
     config LAB_WIFI_SSID
         string "Wi-Fi SSID"

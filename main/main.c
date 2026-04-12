@@ -1,31 +1,34 @@
 /*
- * ESP32 + SIM7000: esp_modem UART DTE, PPP esp_netif, SIM7000 DCE bring-up + data mode.
- * Wiring: see README and `idf.py menuconfig` -> Modem UART transport.
+ * ESP32 + SIM7000: optional esp_modem UART DTE, PPP esp_netif, SIM7000 DCE bring-up + data mode.
+ * Wiring: see README and `idf.py menuconfig` -> Modem UART transport / Application.
  */
 #include <stdio.h>
 #include <string.h>
 
-#include "driver/uart.h"
 #include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
-#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#include "modem_config.h"
-#include "modem_uart.h"
 #include "nvs_flash.h"
+#include "sdkconfig.h"
+#if CONFIG_READINGS_UPLOAD_ENABLE
 #include "readings_config.h"
 #include "readings_upload.h"
+#endif
+#if CONFIG_APP_ENABLE_CELLULAR
+#include "driver/uart.h"
+#include "modem_config.h"
+#include "modem_uart.h"
 #include "sim7000.h"
-#include "sdkconfig.h"
-#if CONFIG_LAB_WIFI_SNTP
+#endif
+#if CONFIG_LAB_WIFI_SNTP || (CONFIG_READINGS_UPLOAD_ENABLE && !CONFIG_APP_ENABLE_CELLULAR)
 #include "wifi_lab_sntp.h"
 #endif
 
-#if CONFIG_LWIP_PPP_SUPPORT
+#if CONFIG_APP_ENABLE_CELLULAR && CONFIG_LWIP_PPP_SUPPORT
 #include "esp_modem_api.h"
 #include "esp_modem_config.h"
 #include "esp_modem_dce_config.h"
@@ -35,7 +38,7 @@
 
 static const char *TAG = "app";
 
-#if CONFIG_LWIP_PPP_SUPPORT
+#if CONFIG_APP_ENABLE_CELLULAR && CONFIG_LWIP_PPP_SUPPORT
 
 /** esp_modem runs setup_data_mode() before dial: ATE0 + CGDCONT for CID 1 with the DCE APN. */
 #define PPP_WAIT_IP_TIMEOUT_MS 120000
@@ -82,7 +85,7 @@ static void on_ppp_phase(void *arg, esp_event_base_t event_base, int32_t event_i
     ESP_LOGD(TAG, "NETIF_PPP event %ld", (long)event_id);
 }
 
-#endif /* CONFIG_LWIP_PPP_SUPPORT */
+#endif /* CONFIG_APP_ENABLE_CELLULAR && CONFIG_LWIP_PPP_SUPPORT */
 
 void app_main(void)
 {
@@ -122,10 +125,19 @@ void app_main(void)
             ESP_LOGW(TAG, "Lab Wi-Fi SNTP: %s — continuing without wall-clock sync", esp_err_to_name(lab));
         }
     }
+#elif CONFIG_READINGS_UPLOAD_ENABLE && !CONFIG_APP_ENABLE_CELLULAR
+    {
+        esp_err_t wr = wifi_readings_sta_upload_and_teardown();
+        if (wr != ESP_OK) {
+            ESP_LOGW(TAG, "Wi-Fi readings: %s", esp_err_to_name(wr));
+        }
+    }
 #endif
 
+#if CONFIG_APP_ENABLE_CELLULAR
+
 #if !CONFIG_LWIP_PPP_SUPPORT
-    ESP_LOGE(TAG, "CONFIG_LWIP_PPP_SUPPORT is required (enable in menuconfig or sdkconfig.defaults)");
+    ESP_LOGE(TAG, "APP_ENABLE_CELLULAR requires CONFIG_LWIP_PPP_SUPPORT (menuconfig: LWIP -> PPP)");
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
@@ -251,22 +263,15 @@ void app_main(void)
 
 #if CONFIG_READINGS_UPLOAD_ENABLE
     {
-        char api_key[256];
-        char base_url[160];
-        char dev_id[256];
-        esp_err_t cf = readings_config_load(api_key, sizeof(api_key), base_url, sizeof(base_url), dev_id,
-                                            sizeof(dev_id));
-        if (cf != ESP_OK) {
+        esp_err_t up = readings_upload_run_from_nvs_blocking();
+        if (up == ESP_ERR_NVS_NOT_FOUND) {
             ESP_LOGW(TAG,
-                     "Readings API: missing NVS %s/%s (%s) — skip upload. "
+                     "Readings API: missing NVS %s/%s — skip upload. "
                      "Provision once with readings_config_save_api_key() or nvs_set_str.",
-                     READINGS_NVS_NAMESPACE, READINGS_NVS_KEY_API_KEY, esp_err_to_name(cf));
-        } else {
-            double uptime_s = (double)(esp_timer_get_time() / 1000000LL);
-            esp_err_t up = readings_upload_post(api_key, base_url, dev_id, uptime_s);
-            if (up != ESP_OK) {
-                ESP_LOGW(TAG, "Readings upload failed: %s", esp_err_to_name(up));
-            }
+                     READINGS_NVS_NAMESPACE,
+                     READINGS_NVS_KEY_API_KEY);
+        } else if (up != ESP_OK) {
+            ESP_LOGW(TAG, "Readings upload failed: %s", esp_err_to_name(up));
         }
     }
 #endif
@@ -295,5 +300,16 @@ command_heartbeat:
         }
         vTaskDelay(pdMS_TO_TICKS(3000));
     }
+
 #endif /* CONFIG_LWIP_PPP_SUPPORT */
+
+#else /* !CONFIG_APP_ENABLE_CELLULAR */
+
+    ESP_LOGI(TAG, "Cellular disabled: no modem / PPP");
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(30000));
+        ESP_LOGI(TAG, "idle");
+    }
+
+#endif /* CONFIG_APP_ENABLE_CELLULAR */
 }

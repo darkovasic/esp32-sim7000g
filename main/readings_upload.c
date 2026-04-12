@@ -1,10 +1,16 @@
 #include "readings_upload.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "esp_crt_bundle.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
+#include "readings_config.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "readings_up";
@@ -97,5 +103,57 @@ esp_err_t readings_upload_post(const char *api_key, const char *api_base, const 
 
     ESP_LOGI(TAG, "POST /data succeeded (201)");
     return ESP_OK;
+#endif
+}
+
+#if CONFIG_READINGS_UPLOAD_ENABLE
+/* ESP-IDF: xTaskCreate stack depth is bytes (not FreeRTOS "words"). */
+#define READINGS_WORKER_STACK_BYTES 10240
+
+static SemaphoreHandle_t s_readings_done_sem;
+static esp_err_t s_readings_worker_err;
+
+static void readings_upload_worker_task(void *arg)
+{
+    (void)arg;
+    char api_key[256];
+    char base_url[160];
+    char dev_id[256];
+
+    esp_err_t cf =
+        readings_config_load(api_key, sizeof(api_key), base_url, sizeof(base_url), dev_id, sizeof(dev_id));
+    if (cf != ESP_OK) {
+        s_readings_worker_err = cf;
+        xSemaphoreGive(s_readings_done_sem);
+        vTaskDelete(NULL);
+        return;
+    }
+    double uptime_s = (double)(esp_timer_get_time() / 1000000LL);
+    s_readings_worker_err = readings_upload_post(api_key, base_url, dev_id, uptime_s);
+    xSemaphoreGive(s_readings_done_sem);
+    vTaskDelete(NULL);
+}
+#endif
+
+esp_err_t readings_upload_run_from_nvs_blocking(void)
+{
+#if !CONFIG_READINGS_UPLOAD_ENABLE
+    return ESP_ERR_NOT_SUPPORTED;
+#else
+    s_readings_done_sem = xSemaphoreCreateBinary();
+    if (s_readings_done_sem == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+    BaseType_t created = xTaskCreate(readings_upload_worker_task, "readings_up", READINGS_WORKER_STACK_BYTES,
+                                     NULL, 5, NULL);
+    if (created != pdPASS) {
+        vSemaphoreDelete(s_readings_done_sem);
+        s_readings_done_sem = NULL;
+        return ESP_ERR_NO_MEM;
+    }
+    xSemaphoreTake(s_readings_done_sem, portMAX_DELAY);
+    vSemaphoreDelete(s_readings_done_sem);
+    s_readings_done_sem = NULL;
+    return s_readings_worker_err;
 #endif
 }

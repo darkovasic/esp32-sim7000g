@@ -14,6 +14,9 @@ extern "C" {
 esp_err_t readings_upload_post(const char *api_key, const char *api_base, const char *device_id,
                                double value);
 
+/** Load NVS/Kconfig readings fields and POST /data on a dedicated task (avoids main-stack TLS overflow). */
+esp_err_t readings_upload_run_from_nvs_blocking(void);
+
 #ifdef __cplusplus
 }
 #endif
