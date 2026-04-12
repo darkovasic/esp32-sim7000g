@@ -22,8 +22,13 @@ menu "Application"
         default 60
         range 0 86400
         help
-            After deep sleep, wake this many seconds later and rerun from boot (e.g. 60 = every minute).
+            After deep sleep, wake this many seconds later and rerun from boot (e.g. 60 = every minute,
+            86400 = 24 hours). Timer wakeup does not require RTC memory or RTC peripherals to stay powered;
+            esp_deep_sleep_start() powers down unused RTC domains automatically.
             0 disables timer wake — chip stays in deep sleep until external reset.
+            Do not call esp_sleep_pd_config(RTC_SLOW_MEM/FAST_MEM, OFF) before deep sleep on ESP32: IDF
+            places the deep-sleep wake stub in RTC memory; forcing those domains off causes LoadProhibited
+            inside esp_deep_sleep_start(). Timer wake already uses ESP_PD_OPTION_AUTO for unused domains.
 
 endmenu
 

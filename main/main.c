@@ -94,7 +94,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Firmware %s", app->version);
 
 #if !CONFIG_APP_ENABLE_CELLULAR && CONFIG_APP_DEEP_SLEEP_WHEN_DONE && CONFIG_APP_DEEP_SLEEP_TIMER_SEC > 0
-    if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
+    if (esp_sleep_get_wakeup_causes() & BIT(ESP_SLEEP_WAKEUP_TIMER)) {
         ESP_LOGI(TAG, "Woke from deep sleep (RTC timer)");
     }
 #endif

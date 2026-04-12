@@ -144,7 +144,7 @@ static void wifi_sta_teardown(void)
 #if CONFIG_READINGS_UPLOAD_ENABLE && !CONFIG_APP_ENABLE_CELLULAR
 static void readings_upload_once(void)
 {
-    esp_err_t e = readings_upload_run_from_nvs_blocking();
+    esp_err_t e = readings_upload_run_from_nvs_blocking_ex(true);
     if (e == ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGW(TAG,
                  "Readings: missing NVS %s/%s — skip upload",
