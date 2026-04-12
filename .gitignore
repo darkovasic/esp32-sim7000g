@@ -15,6 +15,7 @@ dependencies.lock
 *.swp
 *~
 .DS_Store
+*.code-workspace
 
 # Python
 __pycache__/
