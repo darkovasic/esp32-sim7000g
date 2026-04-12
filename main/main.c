@@ -21,6 +21,9 @@
 #include "readings_upload.h"
 #include "sim7000.h"
 #include "sdkconfig.h"
+#if CONFIG_LAB_WIFI_SNTP
+#include "wifi_lab_sntp.h"
+#endif
 
 #if CONFIG_LWIP_PPP_SUPPORT
 #include "esp_modem_api.h"
@@ -111,6 +114,15 @@ void app_main(void)
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+#if CONFIG_LAB_WIFI_SNTP
+    {
+        esp_err_t lab = wifi_lab_sntp_sync_and_teardown();
+        if (lab != ESP_OK) {
+            ESP_LOGW(TAG, "Lab Wi-Fi SNTP: %s — continuing without wall-clock sync", esp_err_to_name(lab));
+        }
+    }
+#endif
 
 #if !CONFIG_LWIP_PPP_SUPPORT
     ESP_LOGE(TAG, "CONFIG_LWIP_PPP_SUPPORT is required (enable in menuconfig or sdkconfig.defaults)");

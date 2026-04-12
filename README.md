@@ -32,6 +32,11 @@ UART for the modem is configured in **`main/main.c`** from **Modem UART transpor
 - **Modem UART transport** — UART port/pins/baud/buffers for **esp_modem**; optional **PWRKEY**.
 - **SIM7000 modem** — default APN, PDP bring-up options, AT timeout/response size, and **wait for network registration** before PPP (helps cold boot when the modem needs tens of seconds to attach).
 - **Readings API (HTTP upload)** — enable one-shot `POST /data` after PPP, default base URL and `device_id`, HTTPS timeout.
+- **Lab: Wi-Fi time sync (SNTP)** — optional: connect STA, run NTP via `esp_netif_sntp`, set `TZ` for CET/CEST (`localtime()`), then stop Wi-Fi before modem PPP. Set SSID/password here for lab only; do not commit `sdkconfig` with real credentials.
+
+**Partition table:** `sdkconfig.defaults` selects **Single factory app, large** (~1500 KiB app) so the image fits after **esp_wifi** is linked from `main` (required for reliable CMake + optional lab SNTP). Use a **2 MiB** (or larger) flash; adjust in menuconfig if your module differs.
+
+**TLS / time:** Correct wall clock helps certificate validation. Lab SNTP is one way to set time before cellular HTTPS; production setups often use NTP over PPP or carrier time.
 
 ## NVS: APN
 
@@ -59,7 +64,8 @@ Use `readings_config_save_*()` from [main/readings_config.h](main/readings_confi
 |-----------|------|
 | [components/modem_uart](components/modem_uart) | PWRKEY GPIO only (UART owned by esp_modem) |
 | [components/sim7000](components/sim7000) | `sim7000_bringup()` via esp_modem AT API, NVS APN helpers |
-| [main/main.c](main/main.c) | Netif/event init, esp_modem DCE, PPP data mode, IP wait, optional HTTPS POST |
+| [main/main.c](main/main.c) | Netif/event init, optional lab Wi-Fi SNTP, esp_modem DCE, PPP data mode, IP wait, optional HTTPS POST |
+| [main/wifi_lab_sntp.c](main/wifi_lab_sntp.c) | Lab-only: STA + `esp_netif_sntp` + `TZ`; built when `CONFIG_LAB_WIFI_SNTP` |
 | [main/readings_config.c](main/readings_config.c), [main/readings_upload.c](main/readings_upload.c) | NVS + `esp_http_client` upload to `/data` |
 
 Managed dependency: **espressif/esp_modem** (see `main/idf_component.yml`). Do not maintain patches under `managed_components/` (see `.cursor/rules/esp-idf-managed-components.mdc`); vendor or fork if you need upstream changes.

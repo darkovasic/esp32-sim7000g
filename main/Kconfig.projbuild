@@ -47,3 +47,56 @@ menu "Readings API (HTTP upload)"
             Same value as server API_KEY. Leave empty when provisioning is disabled.
 
 endmenu
+
+menu "Lab: Wi-Fi time sync (SNTP)"
+
+    config LAB_WIFI_SNTP
+        bool "Connect Wi-Fi at boot, SNTP sync, then disconnect (before modem PPP)"
+        default n
+        help
+            Lab / development only. Brings up Wi-Fi STA, waits for SNTP to set system time,
+            applies LAB_TZ_POSIX for localtime(), then stops Wi-Fi so cellular PPP is the only
+            data path. Do not enable in production field images unless you intend to use Wi-Fi.
+
+    config LAB_WIFI_SSID
+        string "Wi-Fi SSID"
+        depends on LAB_WIFI_SNTP
+        default "myssid"
+        help
+            STA SSID. Do not commit sdkconfig with your real SSID if the tree is public.
+
+    config LAB_WIFI_PASSWORD
+        string "Wi-Fi password"
+        depends on LAB_WIFI_SNTP
+        default ""
+        help
+            WPA/WPA2 PSK password; leave empty for open networks. Same hygiene as SSID.
+
+    config LAB_WIFI_SNTP_SERVER
+        string "NTP server hostname"
+        depends on LAB_WIFI_SNTP
+        default "pool.ntp.org"
+
+    config LAB_WIFI_CONNECT_TIMEOUT_MS
+        int "Wi-Fi connect timeout (ms)"
+        depends on LAB_WIFI_SNTP
+        default 30000
+        range 5000 120000
+
+    config LAB_SNTP_SYNC_TIMEOUT_MS
+        int "SNTP sync wait timeout (ms)"
+        depends on LAB_WIFI_SNTP
+        default 60000
+        range 10000 300000
+        help
+            lwIP may apply a random SNTP startup delay (Component config -> LWIP -> SNTP).
+            Use a generous timeout here, or reduce/disable the startup delay for faster lab sync.
+
+    config LAB_TZ_POSIX
+        string "POSIX TZ string (CET/CEST)"
+        depends on LAB_WIFI_SNTP
+        default "CET-1CEST,M3.5.0/2,M10.5.0/3"
+        help
+            Passed to setenv(\"TZ\", ...); tzset(). Example is Central European Time with EU DST rules.
+
+endmenu

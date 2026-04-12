@@ -2,6 +2,10 @@
 # After cloning without sdkconfig: run `idf.py set-target esp32` then `idf.py build`.
 # Refresh this file from your tree anytime: `idf.py save-defconfig` (then re-add comments if needed).
 #
+# Default 1 MiB app partition overflows once esp_wifi is linked (main always REQUIRES esp_wifi).
+# "Single factory app, large" fits a 2 MiB flash (menuconfig: Partition Table).
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+#
 # This file was generated using idf.py save-defconfig. It can be edited manually.
 # Espressif IoT Development Framework (ESP-IDF) 6.1.0 Project Minimal Configuration
 #
@@ -30,6 +34,10 @@ CONFIG_SIM7000_REGISTRATION_TIMEOUT_MS=120000
 
 # SIM7000: default APN when NVS namespace `modem` / key `apn` is unset.
 CONFIG_SIM7000_DEFAULT_APN="internet"
+
+# Lab Wi-Fi + SNTP (menuconfig: Lab: Wi-Fi time sync): lwIP already enables SNTP with
+# CONFIG_LWIP_SNTP_MAX_SERVERS default 1. For faster first sync after reset, disable
+# Component config -> LWIP -> SNTP -> Enable SNTP startup delay (or lower max delay).
 
 # Readings API: base URL + device_id defaults; API key must be stored in NVS readings/api_key.
 CONFIG_READINGS_UPLOAD_ENABLE=y
