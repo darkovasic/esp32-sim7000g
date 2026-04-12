@@ -25,13 +25,13 @@ static void trim_trailing_slashes(char *s)
 }
 
 esp_err_t readings_upload_post(const char *api_key, const char *api_base, const char *device_id,
-                               double value)
+                               double value_ms)
 {
 #if !CONFIG_READINGS_UPLOAD_ENABLE
     (void)api_key;
     (void)api_base;
     (void)device_id;
-    (void)value;
+    (void)value_ms;
     return ESP_ERR_NOT_SUPPORTED;
 #else
     if (api_key == NULL || api_key[0] == '\0' || api_base == NULL || api_base[0] == '\0' ||
@@ -59,7 +59,7 @@ esp_err_t readings_upload_post(const char *api_key, const char *api_base, const 
     }
 
     char body[512];
-    int bn = snprintf(body, sizeof(body), "{\"device_id\":\"%s\",\"value\":%.17g}", device_id, value);
+    int bn = snprintf(body, sizeof(body), "{\"device_id\":\"%s\",\"value\":%.17g}", device_id, value_ms);
     if (bn <= 0 || bn >= (int)sizeof(body)) {
         ESP_LOGE(TAG, "JSON body too long (shorten device_id)");
         return ESP_ERR_INVALID_ARG;
@@ -128,8 +128,8 @@ static void readings_upload_worker_task(void *arg)
         vTaskDelete(NULL);
         return;
     }
-    double uptime_s = (double)(esp_timer_get_time() / 1000000LL);
-    s_readings_worker_err = readings_upload_post(api_key, base_url, dev_id, uptime_s);
+    double uptime_ms = (double)(esp_timer_get_time() / 1000LL);
+    s_readings_worker_err = readings_upload_post(api_key, base_url, dev_id, uptime_ms);
     xSemaphoreGive(s_readings_done_sem);
     vTaskDelete(NULL);
 }

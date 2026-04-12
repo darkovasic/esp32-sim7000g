@@ -34,7 +34,7 @@ menu "Readings API (HTTP upload)"
         default y
         help
             After the device has routed internet: one HTTPS POST with JSON {device_id, value} to
-            <base>/data. Requires NVS key readings/api_key.
+            <base>/data (value = ms since boot at POST). Requires NVS key readings/api_key.
             With cellular on: runs after PPP gets an IP. With cellular off: uses Wi-Fi STA — either
             together with Lab Wi-Fi SNTP (same SSID) or Readings Wi-Fi SSID/password below.
 
